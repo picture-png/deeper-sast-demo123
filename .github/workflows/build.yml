@@ -1,27 +1,41 @@
-name: Build
+name: CI with SonarQube
 
 on:
   push:
-    branches:
-      - main
-
+    branches: [main]
 
 jobs:
-  build:
-    name: Build and analyze
+  build-and-scan:
     runs-on: windows-latest
-    
+    services:
+      sonarqube:
+        image: sonarqube:lts
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -s http://localhost:9000/api/system/health | grep -q '\"status\":\"GREEN\"'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      # If you wish to fail your job when the Quality Gate is red, uncomment the
-      # following lines. This would typically be used to fail a deployment.
-      # - uses: SonarSource/sonarqube-quality-gate-action@v1
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          java-version: '17'
+
+      - name: Build (example using Maven)
+        run: |
+          ./mvnw clean verify
+
+      - name: Wait for SonarQube to be ready
+        run: |
+          sleep 30  # или до health-check
+
+      - name: Run Sonar Scanner
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          host-url: 'http://localhost:9000'
+          token: ${{ secrets.SONAR_TOKEN }}

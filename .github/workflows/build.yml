@@ -1,41 +1,28 @@
-name: CI with SonarQube
+name: CI with external SonarQube
 
 on:
   push:
     branches: [main]
 
 jobs:
-  build-and-scan:
+  build-and-analyze:
     runs-on: windows-latest
-    services:
-      sonarqube:
-        image: sonarqube:lts
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -s http://localhost:9000/api/system/health | grep -q '\"status\":\"GREEN\"'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           java-version: '17'
 
-      - name: Build (example using Maven)
+      - name: Install dependencies
         run: |
-          ./mvnw clean verify
+          npm install
 
-      - name: Wait for SonarQube to be ready
-        run: |
-          sleep 30  # или до health-check
-
-      - name: Run Sonar Scanner
+      - name: Run SonarScanner
         uses: sonarsource/sonarqube-scan-action@master
         with:
-          host-url: 'http://localhost:9000'
+          host-url: ${{ secrets.SONAR_HOST_URL }}
           token: ${{ secrets.SONAR_TOKEN }}
